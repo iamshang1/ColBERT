@@ -110,7 +110,7 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
                 scores = scores.view(-1, config.nway)
 
                 if len(target_scores) and config.nway == 1:
-                    loss = nn.BCEWithLogitsLoss(scores, target_scores)
+                    loss = nn.BCEWithLogitsLoss()(scores, target_scores)
 
                 elif len(target_scores) and not config.ignore_scores:
                     target_scores = torch.tensor(target_scores).view(-1, config.nway).to(DEVICE)
