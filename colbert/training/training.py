@@ -87,7 +87,7 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
 
     #     reader.skip_to_batch(start_batch_idx, checkpoint['arguments']['bsize'])
 
-    for batch_idx, BatchSteps in tqdm(zip(range(start_batch_idx, config.maxsteps), reader)):
+    for batch_idx, BatchSteps in tqdm(zip(range(start_batch_idx, config.maxsteps), reader),total=len(reader)):
         if (warmup_bert is not None) and warmup_bert <= batch_idx:
             set_bert_grad(colbert, True)
             warmup_bert = None
