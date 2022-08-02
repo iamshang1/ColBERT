@@ -35,6 +35,27 @@ def tensorize_triples(query_tokenizer, doc_tokenizer, queries, passages, scores,
         batches.append((Q, D, S))
 
     return batches
+    
+    
+def tensorize_doubles(query_tokenizer, doc_tokenizer, queries, passages, scores, bsize, nway):
+
+    Q_ids, Q_mask = query_tokenizer.tensorize(queries)
+    D_ids, D_mask = doc_tokenizer.tensorize(passages)
+
+    query_batches = _split_into_batches(Q_ids, Q_mask, bsize)
+    doc_batches = _split_into_batches(D_ids, D_mask, bsize * nway)
+
+    if len(scores):
+        score_batches = _split_into_batches2(scores, bsize * nway)
+    else:
+        score_batches = [[] for _ in doc_batches]
+
+    batches = []
+    for Q, D, S in zip(query_batches, doc_batches, score_batches):
+        batches.append((Q, D, S))
+
+    return batches
+
 
 
 def _sort_by_length(ids, mask, bsize):

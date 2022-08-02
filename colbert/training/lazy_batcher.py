@@ -4,7 +4,7 @@ import ujson
 from functools import partial
 from colbert.infra.config.config import ColBERTConfig
 from colbert.utils.utils import print_message, zipstar
-from colbert.modeling.tokenization import QueryTokenizer, DocTokenizer, tensorize_triples
+from colbert.modeling.tokenization import QueryTokenizer, DocTokenizer, tensorize_triples, tensorize_doubles
 from colbert.evaluation.loaders import load_collection
 
 from colbert.data.collection import Collection
@@ -73,3 +73,52 @@ class LazyBatcher():
     # def skip_to_batch(self, batch_idx, intended_batch_size):
     #     Run.warn(f'Skipping to batch #{batch_idx} (with intended_batch_size = {intended_batch_size}) for training.')
     #     self.position = intended_batch_size * batch_idx
+
+
+class STSBatcher():
+    def __init__(self, config: ColBERTConfig, doubles, queries, collection, rank=0, nranks=1):
+        self.bsize, self.accumsteps = config.bsize, config.accumsteps
+        self.nway = 1
+
+        self.query_tokenizer = QueryTokenizer(config)
+        self.doc_tokenizer = DocTokenizer(config)
+        self.tensorize_doubles = partial(tensorize_doubles, self.query_tokenizer, self.doc_tokenizer)
+        self.position = 0
+
+        self.doubles = Examples.cast(doubles, nway=2).tolist(rank, nranks)
+        self.queries = Queries.cast(queries)
+        self.collection = Collection.cast(collection)
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self.doubles)
+
+    def __next__(self):
+        offset, endpos = self.position, min(self.position + self.bsize, len(self.doubles))
+        self.position = endpos
+
+        if offset + self.bsize > len(self.doubles):
+            raise StopIteration
+
+        all_queries, all_passages, all_scores = [], [], []
+
+        for position in range(offset, endpos):
+            query, pid, score = self.doubles[position]
+            query = self.queries[query]
+            passage = self.collection[pid]
+
+            all_queries.append(query)
+            all_passages.append(passage)
+            all_scores.append(score)
+        
+        assert len(all_scores) in [0, len(all_passages)], len(all_scores)
+
+        return self.collate(all_queries, all_passages, all_scores)
+
+    def collate(self, queries, passages, scores):
+        assert len(queries) == self.bsize
+        assert len(passages) == self.nway * self.bsize
+
+        return self.tensorize_doubles(queries, passages, scores, self.bsize // self.accumsteps, self.nway)

@@ -9,7 +9,7 @@ from colbert.infra import ColBERTConfig
 from colbert.training.rerank_batcher import RerankBatcher
 
 from colbert.utils.amp import MixedPrecisionManager
-from colbert.training.lazy_batcher import LazyBatcher
+from colbert.training.lazy_batcher import LazyBatcher, STSBatcher
 from colbert.parameters import DEVICE
 
 from colbert.modeling.colbert import ColBERT
@@ -39,6 +39,8 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
     if collection is not None:
         if config.reranker:
             reader = RerankBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
+        elif config.sts_training:
+            reader = STSBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
         else:
             reader = LazyBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
     else:
@@ -107,7 +109,10 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
 
                 scores = scores.view(-1, config.nway)
 
-                if len(target_scores) and not config.ignore_scores:
+                if len(target_scores) and config.sts_training:
+                    loss = nn.BCELoss(scores, target_scores)
+
+                elif len(target_scores) and not config.ignore_scores:
                     target_scores = torch.tensor(target_scores).view(-1, config.nway).to(DEVICE)
                     target_scores = target_scores * config.distillation_alpha
                     target_scores = torch.nn.functional.log_softmax(target_scores, dim=-1)
