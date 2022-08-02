@@ -39,7 +39,7 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
     if collection is not None:
         if config.reranker:
             reader = RerankBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
-        elif config.sts_training:
+        elif config.nway == 1:
             reader = STSBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
         else:
             reader = LazyBatcher(config, triples, queries, collection, (0 if config.rank == -1 else config.rank), config.nranks)
@@ -109,7 +109,7 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
 
                 scores = scores.view(-1, config.nway)
 
-                if len(target_scores) and config.sts_training:
+                if len(target_scores) and config.nway == 1:
                     loss = nn.BCELoss(scores, target_scores)
 
                 elif len(target_scores) and not config.ignore_scores:
