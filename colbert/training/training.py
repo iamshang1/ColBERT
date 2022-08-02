@@ -3,6 +3,7 @@ import torch
 import random
 import torch.nn as nn
 import numpy as np
+from tqdm.auto import tqdm
 
 from transformers import AdamW, get_linear_schedule_with_warmup
 from colbert.infra import ColBERTConfig
@@ -86,7 +87,7 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
 
     #     reader.skip_to_batch(start_batch_idx, checkpoint['arguments']['bsize'])
 
-    for batch_idx, BatchSteps in zip(range(start_batch_idx, config.maxsteps), reader):
+    for batch_idx, BatchSteps in tqdm(zip(range(start_batch_idx, config.maxsteps), reader)):
         if (warmup_bert is not None) and warmup_bert <= batch_idx:
             set_bert_grad(colbert, True)
             warmup_bert = None
@@ -131,8 +132,8 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
 
                 loss = loss / config.accumsteps
 
-            if config.rank < 1:
-                print_progress(scores)
+            #if config.rank < 1:
+            #    print_progress(scores)
 
             amp.backward(loss)
 
@@ -144,11 +145,11 @@ def train(config: ColBERTConfig, triples, queries=None, collection=None):
         amp.step(colbert, optimizer, scheduler)
 
         if config.rank < 1:
-            print_message(batch_idx, train_loss)
+            #print_message(batch_idx, train_loss)
             manage_checkpoints(config, colbert, optimizer, batch_idx+1, savepath=None)
 
     if config.rank < 1:
-        print_message("#> Done with all triples!")
+        #print_message("#> Done with all triples!")
         ckpt_path = manage_checkpoints(config, colbert, optimizer, batch_idx+1, savepath=None, consumed_all_triples=True)
 
         return ckpt_path  # TODO: This should validate and return the best checkpoint, not just the last one.
